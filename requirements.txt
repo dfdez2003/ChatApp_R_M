@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+redis
+channels
+python-dotenv
+pydantic
