@@ -22,6 +22,11 @@ async def crear_usuario(data):
     fecha = datetime.utcnow().isoformat()
     hashed = hash_password(data.password)
 
+    # 💡 Verificamos que la clave no exista con otro tipo
+    tipo = await r.type(f"usuario:{usuario_id}")
+    if tipo != b"none" and tipo != b"hash":
+        raise Exception(f"Conflicto de tipo en usuario:{usuario_id}. Ya existe con tipo {tipo.decode()}")
+
     await r.hset(f"usuario:{usuario_id}", mapping={
         "nombre": data.nombre,
         "surname": data.surname,
@@ -37,6 +42,7 @@ async def crear_usuario(data):
         "email": data.email,
         "fecha_registro": fecha
     }
+
 
     
 

@@ -1,0 +1,25 @@
+<!DOCTYPE html>    <!-- Documentos html5 -->
+<html lang="es">    <!-- Documento en español -->
+<head>               <!-- Meta datos y re cursos externos -->
+  <meta charset="UTF-8"> 
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- apata para movil -->
+  <title>Registro - ChatApp</title>                      <!-- titulo  -->
+  <link rel="stylesheet" href="static/css/estilos.css">        <!--  Enlaza el css para la pagina-->
+</head>
+<body>                      <!--  Contenido de la pagina -->
+  <h2>Registro de Usuario</h2>
+  <form id="formRegistro">          <!-- Formato  con id para poder mnipularlo en el js -->
+    <input type="text" id="nombre" placeholder="Nombre" required>               <!-- required es que sea obligatorio -->
+    <input type="text" id="surname" placeholder="Apellido" required>
+    <input type="text" id="username" placeholder="Username" required>           <!--  placeholder es  el texto de ejemplo-->
+    <input type="email" id="email" placeholder="Correo electrónico" required>
+    <input type="password" id="password" placeholder="Contraseña" required>      <!-- el type ="password " oculta  lo que se ingresa  -->
+    <button type="submit">Registrarse</button>
+    <div id="mensaje"></div>                    <!--  Contenedor para exito o error-->
+  </form>
+
+  <!-- Archivo JavaScript externo -->
+  <script src="static/js/registro.js"></script> <!-- Enalza el archivo js  -->
+</body>
+</html>
+  
