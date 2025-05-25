@@ -2,31 +2,18 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from schemas.sala import SalaCreate, ExpulsionData
+from fastapi.responses import HTMLResponse, FileResponse
 from services.sala import crear_sala, unirse_a_sala, mostrar_salas_propias, mostrar_salas_random, expulsar_usuario
 from utils.auth import get_current_user  # esta función saca el user del token
+
 from schemas.sala import UnirseSala
-
-
 
 router = APIRouter(prefix="/salas", tags=["salas"])
 
+@router.get("/", response_class=FileResponse)
+async def get_salas_page():
+    return "static/salas.html"
 
-@router.post("/")
-async def login():
-    return {"message": "Entro a una sala"}
-
-@router.post("/Chatear")
-async def register():
-    return {"message": "Ya puede chatear!!"}
-
-
-@router.post("/createchafa")
-async def crear_nueva_sala(sala: SalaCreate, user=Depends(get_current_user)):
-    try:
-        nueva = await crear_sala(sala, user["id"])
-        return {"mensaje": "Sala creada", "sala": nueva}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/create")

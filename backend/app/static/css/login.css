@@ -1,0 +1,109 @@
+/* Establecer una fuente base y un fondo oscuro */
+body {
+    font-family: 'Poppins', sans-serif;
+    background-color: #1f1f1f;
+    color: white;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    flex-direction: column;
+  }
+  
+  /* Estilo del título */
+  h2 {
+    font-size: 90px;
+    margin-bottom: 20px;
+    color: #fff;
+    text-align: center;
+    animation: fadeIn 1.5s ease-in-out;
+  }
+  
+  /* Estilos para el formulario */
+  form {
+    background: #2c2c2c;
+    padding: 30px;
+    display: f;
+    
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+    width: 300px;
+    animation: slideUp 0.8s ease-out;
+    
+  }
+  
+  /* Estilos de los labels */
+  label {
+    font-size: 14px;
+    margin-bottom: 8px;
+    display: block;
+    color: #ddd;
+  }
+  
+  /* Estilo de los campos de entrada */
+  input[type="text"],
+  input[type="password"],
+  input[type="email"]
+  {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 20px;
+    border: 1px solid #555;
+    border-radius: 5px;
+    background-color: #333;
+    color: white;
+    font-size: 16px;
+  }
+  
+  /* Estilo del botón */
+  button {
+    background-color: #ff6b6b;
+    color: white;
+    font-size: 18px;
+    border: none;
+    padding: 12px;
+    border-radius: 5px;
+    width: 100%;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+  }
+  
+  button:hover {
+    background-color: #ff3b3b;
+    transform: scale(1.1);
+  }
+  
+  /* Animaciones */
+  @keyframes fadeIn {
+    0% {
+        opacity: 0;
+    }
+    100% {
+        opacity: 1;
+    }
+  }
+  
+  @keyframes slideUp {
+    0% {
+        transform: translateY(50px);
+        opacity: 0;
+    }
+    100% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+  }
+  
+  /* Animación de enfoque en los campos de texto */
+  input:focus {
+    border-color: #ff6b6b;
+    outline: none;
+    box-shadow: 0 0 5px #ff6b6b;
+  }
+  

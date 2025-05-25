@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Chat en Sala</title>
+  <link rel="stylesheet" href="/static/css/chat.css">
+</head>
+<body>
+  <div class="chat-wrapper">
+    <h2>Chat en Tiempo Real</h2>
+
+    <div class="chat-container">
+      <div id="chatbox" class="chatbox"></div>
+
+      <div class="message-input-area">
+        <input type="text" id="messageInput" placeholder="Escribe un mensaje..." />
+        <button onclick="sendMessage()">Enviar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/chat.js"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const roomId = params.get("room_id");
+
+    if (!roomId) {
+      alert("No se especificó room_id en la URL.");
+    } else {
+      startChat(roomId);
+    }
+  </script>
+</body>
+</html>

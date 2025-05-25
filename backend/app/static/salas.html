@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Salas - EphemerChat</title>
+  <link rel="stylesheet" href="/static/css/salas.css">
+</head>
+<body>
+  <header class="barra-superior"><!-- Rcuadro superior -->
+    <div class="user-mini-info">
+      <span id="usuarioActivo">Cargando usuario...</span>
+    </div>
+    <button id="cerrarSesionBtn">Cerrar sesión</button>
+  </header>
+
+  <div class="chat-layout">
+    <aside class="sidebar">
+      <!-- Sección de perfil del usuario -->
+      <div id="datos-usuario" class="user-profile">
+        <div class="user-profile-header">
+          <div class="user-avatar" id="user-avatar">A</div>
+          <div class="user-details">
+            <h3 class="user-name" id="user-name">Cargando...</h3>
+            <div class="user-email" id="user-email">usuario@ejemplo.com</div>
+          </div>
+        </div>
+        <div class="user-meta">
+          <span id="user-member-since">Miembro desde: Cargando...</span>
+          <span id="user-last-access">Último acceso: Ahora</span>
+        </div>
+      </div>
+
+      <h3>Mis Salas</h3>
+      <div id="mis-salas" class="salas-lista"></div>
+    </aside>
+
+    <main class="main-content">
+      <h3>Salas Populares</h3>
+      <div class="crear-sala">
+        <h4>Crear nueva sala</h4>
+        <input type="text" id="nombreSala" placeholder="Nombre">
+        <textarea id="descripcionSala" placeholder="Descripción"></textarea>
+        <button id="btnCrearSala">Crear</button>
+      </div>
+      <div id="salas-random" class="salas-lista-popular"></div>
+    </main>
+  </div>
+
+  <script src="/static/js/salas.js"></script>
+</body>
+</html>

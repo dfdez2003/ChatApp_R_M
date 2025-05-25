@@ -1,25 +1,24 @@
-<!DOCTYPE html>    <!-- Documentos html5 -->
-<html lang="es">    <!-- Documento en español -->
-<head>               <!-- Meta datos y re cursos externos -->
-  <meta charset="UTF-8"> 
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- apata para movil -->
-  <title>Registro - ChatApp</title>                      <!-- titulo  -->
-  <link rel="stylesheet" href="static/css/estilos.css">        <!--  Enlaza el css para la pagina-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Registro</title>
+    <!-- Fuente Poppins de Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Estilos CSS -->
+    <link rel="stylesheet" href="/static/css/login.css">
 </head>
-<body>                      <!--  Contenido de la pagina -->
-  <h2>Registro de Usuario</h2>
-  <form id="formRegistro">          <!-- Formato  con id para poder mnipularlo en el js -->
-    <input type="text" id="nombre" placeholder="Nombre" required>               <!-- required es que sea obligatorio -->
-    <input type="text" id="surname" placeholder="Apellido" required>
-    <input type="text" id="username" placeholder="Username" required>           <!--  placeholder es  el texto de ejemplo-->
-    <input type="email" id="email" placeholder="Correo electrónico" required>
-    <input type="password" id="password" placeholder="Contraseña" required>      <!-- el type ="password " oculta  lo que se ingresa  -->
-    <button type="submit">Registrarse</button>
-    <div id="mensaje"></div>                    <!--  Contenedor para exito o error-->
-  </form>
+<body>
+    <h2>Registro</h2>
+    <form id="registerForm">
+        <input type="text" id="nombre" placeholder="Nombre" required>
+        <input type="text" id="surname" placeholder="Apellido" required>
+        <input type="text" id="username" placeholder="Usuario" required>
+        <input type="email" id="email" placeholder="Email" required>
+        <input type="password" id="password" placeholder="Contraseña" required>
+        <button type="submit">Registrar</button>
+    </form>
 
-  <!-- Archivo JavaScript externo -->
-  <script src="static/js/registro.js"></script> <!-- Enalza el archivo js  -->
+    <script src="/static/js/register.js"></script>
 </body>
 </html>
-  

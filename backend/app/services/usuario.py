@@ -5,6 +5,8 @@ from datetime import datetime
 from passlib.context import CryptContext    # sale sale libreria para hash
 from schemas.usuario import UsuarioOut
 import redis.asyncio as redis
+import logging
+logger = logging.getLogger(__name__)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto") # hash 
 r = redis.Redis()
@@ -14,6 +16,13 @@ def hash_password(password: str) -> str:
 
 async def crear_usuario(data):
     async for key in r.scan_iter(match="usuario:*"):
+        tipo = await r.type(key)
+
+        # ✅ Validar que sea HASH antes de hacer HGET
+        if tipo != b"hash":
+            print(f"[DEBUG] Ignorando clave {key.decode()} de tipo {tipo.decode()}")
+            continue
+
         email = await r.hget(key, "email")
         if email and email.decode() == data.email:
             raise Exception("Correo ya registrado")
@@ -22,12 +31,12 @@ async def crear_usuario(data):
     fecha = datetime.utcnow().isoformat()
     hashed = hash_password(data.password)
 
-    # 💡 Verificamos que la clave no exista con otro tipo
-    tipo = await r.type(f"usuario:{usuario_id}")
+    usuario_hash_key = f"usuario:{usuario_id}"
+    tipo = await r.type(usuario_hash_key)
     if tipo != b"none" and tipo != b"hash":
-        raise Exception(f"Conflicto de tipo en usuario:{usuario_id}. Ya existe con tipo {tipo.decode()}")
+        raise Exception(f"Conflicto de tipo en {usuario_hash_key}. Ya existe con tipo {tipo.decode()}")
 
-    await r.hset(f"usuario:{usuario_id}", mapping={
+    await r.hset(usuario_hash_key, mapping={
         "nombre": data.nombre,
         "surname": data.surname,
         "username": data.username,
@@ -36,6 +45,8 @@ async def crear_usuario(data):
         "fecha_registro": fecha
     })
 
+    print(f"[DEBUG] Usuario creado en {usuario_hash_key}")
+
     return {
         "id": usuario_id,
         "nombre": data.nombre,
@@ -43,10 +54,7 @@ async def crear_usuario(data):
         "fecha_registro": fecha
     }
 
-
     
-
-
 async def logiar_usuario(data):  # data tiene: username, password
     async for key in r.scan_iter(match="usuario:*"):
         tipo = await r.type(key)
@@ -60,7 +68,8 @@ async def logiar_usuario(data):  # data tiene: username, password
             if password_hash and pwd_context.verify(data.password, password_hash.decode()):
                 datos = await r.hgetall(key)
                 usuario_dict = {k.decode(): v.decode() for k, v in datos.items()}
-
+                 # Log de depuración
+                print("\n[DEBUG] Datos del usuario desde Redis:", usuario_dict)
                 usuario_out_data = {
                     "id": key.decode().split(":")[1],
                     "nombre": usuario_dict.get("nombre"),
@@ -69,7 +78,8 @@ async def logiar_usuario(data):  # data tiene: username, password
                     "email": usuario_dict.get("email"),
                     "fecha_registro": usuario_dict.get("fecha_registro"),
                 }
-
+                # Log del objeto de salida
+                print("[DEBUG] Objeto de salida:", usuario_out_data)
                 return UsuarioOut(**usuario_out_data)
 
     raise Exception("Usuario o contraseña incorrectos")

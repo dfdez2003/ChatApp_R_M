@@ -26,3 +26,15 @@ class MensajeEdit(BaseModel):
 class MensajeDelete(BaseModel):
     sala_id: str
     mensaje_id: str
+
+class Mensaje(BaseModel):
+    usuario_id: str
+    username: str
+    contenido: str
+    timestamp: str  # ISO string
+
+    def to_dict(self):
+        return self.dict()
+
+    def to_json(self):
+        return self.model_dump_json()

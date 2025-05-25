@@ -1,32 +1,47 @@
-document.getElementById("loginForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
+document.addEventListener("DOMContentLoaded", () => {
+    const form = document.getElementById("loginForm");
 
-    const username = document.getElementById("username").value;
-    const password = document.getElementById("password").value;
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();  // Evita el envío tradicional del formulario
+        e.stopPropagation(); // Detiene propagación innecesaria
 
-    const loginData = {
-        username,
-        password
-    };
+        const username = document.getElementById("username").value.trim();
+        const password = document.getElementById("password").value.trim();
 
-    try {
-        const response = await fetch("http://localhost:8000/auth/login", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(loginData)
-        });
-
-        const data = await response.json();
-        if (response.ok) {
-            localStorage.setItem("access_token", data.access_token);  // Guardamos el token
-            alert("Inicio de sesión exitoso");
-            window.location.href = "home.html";  // Redirigir a la página de inicio
-        } else {
-            alert(`Error: ${data.detail}`);
+        if (!username || !password) {
+            alert("Por favor completa todos los campos.");
+            return;
         }
-    } catch (error) {
-        console.error("Error al iniciar sesión:", error);
-    }
+
+        try {
+            const response = await fetch(`${window.location.origin}/auth/login`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ username, password })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || "Error al iniciar sesión");
+            }
+
+            const data = await response.json();
+            console.log("✅ Login exitoso:", data);
+            // ✅ Guardar token y usuario
+            localStorage.setItem("token", data.access_token);
+            localStorage.setItem("usuario", JSON.stringify(data.usuario));
+
+            // Esperar un poco para asegurar escritura antes de redirigir
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // ✅ Redirigir al panel de salas
+            window.location.href = `${window.location.origin}/salas/`;
+
+        } catch (error) {
+            console.error("Error en login:", error);
+            alert(error.message);
+        }
+    });
 });

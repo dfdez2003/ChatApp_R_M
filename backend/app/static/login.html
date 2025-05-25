@@ -2,21 +2,24 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Iniciar Sesión</title>                        <!-- titulo  -->
-    <link rel="stylesheet" href="static/css/estilos.css">       <!-- Estilos  -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar sesión</title>
+    <link rel="stylesheet" href="/static/css/login.css">
 </head>
 <body>
-    <h2>Iniciar Sesión</h2>
-    <form id="loginForm">                                <!-- etiqueta para usar en js  -->
-        <label>Nombre de usuario:</label><br>
-        <input type="text" id="username" required><br>   <!-- Tipo texto y el id  -->
+    <h2>EphemerChat</h2>
 
-        <label>Contraseña:</label><br>
-        <input type="password" id="password" required><br><br>   <!-- modo de password  -->
+    <!-- Agregado action="#" para prevenir comportamiento del navegador -->
+    <form id="loginForm" action="#">
+        <label for="username">Nombre de usuario:</label>
+        <input type="text" id="username" required>
 
-        <button type="submit">Entrar</button>               
+        <label for="password">Contraseña:</label>
+        <input type="password" id="password" required>
+
+        <button type="submit">Entrar</button>
     </form>
 
-    <script src="static/js/login.js"></script>
+    <script src="/static/js/login.js"></script>
 </body>
 </html>

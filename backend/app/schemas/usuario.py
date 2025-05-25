@@ -26,12 +26,10 @@ class UsuarioLogin(BaseModel):
 # Esquema para la respuesta que enviarás al cliente cuando creas un usuario / la que ira atravez de la red 
 class UsuarioOut(BaseModel):
     id: str
+    username: str
     nombre: str
     surname: str
-    username: str
-    email: EmailStr
-    fecha_registro: datetime
-    
-    class Config:
-        orm_mode = True
+    email: str
+    fecha_registro: str
+
 
