@@ -1,20 +1,24 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query,Depends
+from fastapi.encoders import jsonable_encoder
 from services.websocket_manager import manager
-
+from services.mensaje import guardar_mensaje
+from schemas.mensaje import MensajeIn
+from utils.auth import verificar_token
+import json
+from datetime import datetime 
+from schemas.usuario import UsuarioOut
+from utils.auth import get_current_user_ws
 router = APIRouter()
 
-@router.websocket("/ws/{room_id}")                                  # Sale con el /ws/{room_id}
-async def websocket_endpoint(websocket: WebSocket, room_id: str):   # Vamos a pasar el websocket y el id de la sala           
-    print(f"🔌 Nueva conexión a sala {room_id}")
-    await manager.connect(websocket, room_id)                       # Realizamos la conexión con el manager 
-    try:                                                            # Creamos un bucle infinito en el que estaremos recibiendo datos ( no conexiónes por que ya esta abierta)
-        while True: 
-            data = await websocket.receive_text()                   # Recibimos texto 
-            print(f"📥 Mensaje recibido en sala {room_id}: {data}") # Imprimimos el id room y el texto
-            await manager.broadcast(room_id, data)                  # Lanzamos el mensaje a todos los websockets de esa sala    
-    except WebSocketDisconnect:                                     # si una conexión se cierra imprimimos
-        print(f"❌ Desconexión de sala {room_id}")
-        await manager.disconnect(websocket, room_id)                # y desconectamos
-
-
-
+@router.websocket("/ws/{room_id}")
+async def websocket_endpoint(websocket: WebSocket, room_id: str, usuario: UsuarioOut = Depends(get_current_user_ws)):
+    await manager.connect(websocket, room_id)  
+    try:
+        while True:
+            data = await websocket.receive_text()
+            mensaje = MensajeIn(**json.loads(data))
+            result = await guardar_mensaje(mensaje, usuario.id)
+            await manager.broadcast(room_id, json.dumps(jsonable_encoder(result)))
+    except WebSocketDisconnect:
+        print("connection closed")
+        await manager.disconnect(room_id, websocket)

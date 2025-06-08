@@ -29,9 +29,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const data = await response.json();
             console.log("✅ Login exitoso:", data);
-            // ✅ Guardar token y usuario
-            localStorage.setItem("token", data.access_token);
-            localStorage.setItem("usuario", JSON.stringify(data.usuario));
+            // ✅ Guardar token y usuario en sessionStorage
+            sessionStorage.setItem("token", data.access_token);
+            sessionStorage.setItem("usuario", JSON.stringify(data.usuario));
 
             // Esperar un poco para asegurar escritura antes de redirigir
             await new Promise(resolve => setTimeout(resolve, 100));

@@ -7,4 +7,5 @@ class UsuarioEnSala(BaseModel):
     fecha_union: datetime = datetime.now()
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+

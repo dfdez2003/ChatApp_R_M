@@ -8,6 +8,14 @@ SECRET_KEY = "tu_clave_secreta"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
+
+from fastapi import WebSocket, HTTPException, status
+from jose import JWTError, jwt
+from schemas.usuario import UsuarioOut
+import redis.asyncio as redis
+
+
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")  # <- esto es importante
 
 # Modelo para los datos dentro del token
@@ -64,3 +72,38 @@ async def verificar_token_ws(token: str):
 
     except JWTError:
         raise cred_error
+    
+def verificar_token(token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return {
+            "id": payload["user_id"]
+        }
+    except JWTError:
+        return None
+
+
+
+
+r = redis.Redis()
+
+async def get_current_user_ws(websocket: WebSocket) -> UsuarioOut:
+    token = websocket.query_params.get("token")
+    if token is None:
+        await websocket.close(code=1008)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token faltante")
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        user_id = payload.get("user_id")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Token inválido")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token inválido")
+
+    user_data = await r.hgetall(f"usuario:{user_id}")
+    if not user_data:
+        raise HTTPException(status_code=401, detail="Usuario no encontrado")
+
+    decoded = {k.decode(): v.decode() for k, v in user_data.items()}
+    return UsuarioOut(id=user_id, **decoded)

@@ -36,12 +36,39 @@
 
     <main class="main-content">
       <h3>Salas Populares</h3>
+      
+      <!-- Formulario mejorado para crear sala -->
       <div class="crear-sala">
         <h4>Crear nueva sala</h4>
-        <input type="text" id="nombreSala" placeholder="Nombre">
-        <textarea id="descripcionSala" placeholder="Descripción"></textarea>
-        <button id="btnCrearSala">Crear</button>
+        <div class="input-group">
+          <label for="nombreSala">Nombre de la sala</label>
+          <input type="text" 
+                 id="nombreSala" 
+                 placeholder="Ej: Club de lectura"
+                 maxlength="50">
+          <small>El nombre debe ser único y descriptivo</small>
+        </div>
+        
+        <div class="input-group">
+          <label for="descripcionSala">Descripción</label>
+          <textarea id="descripcionSala" 
+                    placeholder="Describe el propósito de tu sala..."
+                    maxlength="200"></textarea>
+          <small>Una buena descripción ayuda a otros usuarios a encontrar tu sala</small>
+
+        
+        <div class="input-group">
+          <label for="passwordSala">Contraseña (si es privada):</label>
+          <input type="password" id="passwordSala">
+        </div>
+        <div class="input-group">
+          <label for="tiempo_vida">Tiempo de vida:</label>
+          <input type="text" id="tiempo_vida">
+        </div>
+        
+        <button id="btnCrearSala">Crear nueva sala</button>
       </div>
+
       <div id="salas-random" class="salas-lista-popular"></div>
     </main>
   </div>

@@ -17,11 +17,15 @@ class UsuarioUpdate(BaseModel):
     username: Optional[str] = None
     email: Optional[EmailStr] = None
     password: Optional[str] = None
+    class Config:
+        from_attributes = True
 
 # Esquema para logiarse 
 class UsuarioLogin(BaseModel):
     username: str
     password: str
+    class Config:
+        from_attributes = True
 
 # Esquema para la respuesta que enviarás al cliente cuando creas un usuario / la que ira atravez de la red 
 class UsuarioOut(BaseModel):
@@ -31,5 +35,7 @@ class UsuarioOut(BaseModel):
     surname: str
     email: str
     fecha_registro: str
+    class Config:
+        from_attributes = True
 
 

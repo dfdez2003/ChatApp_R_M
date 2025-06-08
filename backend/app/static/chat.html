@@ -7,13 +7,23 @@
 </head>
 <body>
   <div class="chat-wrapper">
-    <h2>Chat en Tiempo Real</h2>
+    <header class="chat-header">
+      <div class="user-info">
+        <div id="user-avatar" class="user-avatar"></div>
+        <div class="user-details">
+          <span id="user-name">Cargando...</span>
+          <span id="user-status" class="status-online">En línea</span>
+        </div>
+      </div>
+      <button onclick="window.location.href='/salas/'" class="back-button">Volver a Salas</button>
+    </header>
 
     <div class="chat-container">
       <div id="chatbox" class="chatbox"></div>
 
       <div class="message-input-area">
-        <input type="text" id="messageInput" placeholder="Escribe un mensaje..." />
+        <input type="text" id="messageInput" placeholder="Escribe un mensaje..." 
+               onkeypress="if(event.key === 'Enter') sendMessage()"/>
         <button onclick="sendMessage()">Enviar</button>
       </div>
     </div>

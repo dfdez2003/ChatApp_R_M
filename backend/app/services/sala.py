@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 from passlib.context import CryptContext
 import redis.asyncio as redis
+from fastapi import HTTPException
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 r = redis.Redis()
@@ -43,8 +44,11 @@ async def crear_sala(data, creador_id: str):
     # 🆔 Generamos un ID único para la sala
     sala_id = str(uuid.uuid4())
     fecha = datetime.utcnow().isoformat()
-    password_hash = hash_password(data.password) if data.password else ""
-
+    password_hash = ""
+    if data.password:
+        password_hash = pwd_context.hash(data.password)
+    
+    es_publica = "0" if password_hash else "1"
     sala_hash_key = f"sala:{sala_id}"
     sala_usuarios_key = f"sala:{sala_id}:usuarios"
     usuario_salas_key = f"usuario:{creador_id}:salas"
@@ -63,11 +67,12 @@ async def crear_sala(data, creador_id: str):
     # 📝 Crear sala como HASH
     await r.hset(sala_hash_key, mapping={
         "nombre": data.nombre,
+        "descripcion": data.descripcion or "",
+        "tiempo_vida": str(data.tiempo_vida) if data.tiempo_vida else "0",
         "creador_id": creador_id,
-        "es_publica": int(data.es_publica),
+        "es_publica": "1" if not data.password else "0",
         "password_hash": password_hash,
         "fecha_creacion": fecha,
-        "tiempo_vida": data.tiempo_vida or 0
     })
 
     # ✅ Agregar la sala al set del usuario (relación inversa)
@@ -83,6 +88,17 @@ async def crear_sala(data, creador_id: str):
         raise Exception(f"Conflicto de tipo en {sala_usuarios_key}: tipo {tipo_sala_usuarios}")
     await r.sadd(sala_usuarios_key, usuario_key)
     print(f"[DEBUG] Añadido usuario a {sala_usuarios_key} → {usuario_key}")
+    # ⏳ Establecer tiempo de vida (TTL) para la sala y sus mensajes
+    try:
+        tiempo_vida = int(data.tiempo_vida) if data.tiempo_vida else 2  # horas
+        segundos = tiempo_vida * 3600
+
+        await r.expire(sala_hash_key, segundos)                  # expira la sala como hash
+        await r.expire(f"sala:{sala_id}:usuarios", segundos)     # expira set de usuarios
+        await r.expire(f"sala:{sala_id}:mensajes", segundos)     # expira historial de mensajes
+        print(f"[DEBUG] TTL de sala establecido a {segundos} segundos")
+    except Exception as e:
+        print(f"[ERROR] No se pudo establecer TTL: {str(e)}")
 
     return {
         "id": sala_id,
@@ -92,8 +108,34 @@ async def crear_sala(data, creador_id: str):
         "es_publica": data.es_publica
     }
 
-
 async def unirse_a_sala(data, user_id: str):
+    sala_key = f"sala:{data.sala_id}"
+
+    if not await r.exists(sala_key):
+        raise HTTPException(status_code=404, detail="La sala no existe")
+
+    sala_data = await r.hgetall(sala_key)
+    sala_dict = {k.decode(): v.decode() for k, v in sala_data.items()}
+
+    # Verificación para salas privadas (con contraseña)
+    if sala_dict.get("es_publica") == "0":
+        if not data.password:
+            raise HTTPException(status_code=403, detail="Se requiere contraseña")
+        if not pwd_context.verify(data.password, sala_dict.get("password_hash", "")):
+            raise HTTPException(status_code=403, detail="Contraseña incorrecta")
+
+    # Verificación si el usuario ya está en la sala
+    ya_esta = await r.sismember(f"sala:{data.sala_id}:usuarios", f"usuario:{user_id}")
+    if ya_esta:
+        return {"mensaje": "Ya estás en la sala"}
+
+    # Agregar relaciones cruzadas (usuario ↔ sala)
+    await safe_add_sala_usuario(r, user_id, f"sala:{data.sala_id}")
+    await safe_add_usuario_sala(r, data.sala_id, f"usuario:{user_id}")
+
+    return {"mensaje": "Te uniste a la sala", "sala_id": data.sala_id}
+
+async def unirse_a_sala2(data, user_id: str):
     sala_key = f"sala:{data.sala_id}"
 
     if not await r.exists(sala_key):
@@ -147,7 +189,11 @@ async def mostrar_salas_propias(user_id: str):
         datos = await r.hgetall(f"sala:{sala_id}")
         if datos:
             sala = {k.decode(): v.decode() for k, v in datos.items()}
+
             sala["id"] = sala_id
+            #Obtener TTL en segundos
+            ttl = await r.ttl(f"sala:{sala_id}")
+            sala["tiempo_restante"] = ttl if ttl > 0 else None  # Si no tiene TTL, se asume permanente
             salas.append(sala)
     return {"salas": salas}
 
@@ -159,9 +205,14 @@ async def mostrar_salas_random(user_id: str):
             datos = await r.hgetall(k)
             if datos:
                 sala = {k.decode(): v.decode() for k, v in datos.items()}
-                if sala.get("es_publica") == "1":
-                    sala["id"] = k.decode().split(":")[1]
-                    salas.append(sala)
+                # if sala.get("es_publica") == "1":
+                sala_id = k.decode().split(":")[1]
+                sala["id"] = sala_id
+                # Obtener TTL en segundos
+                ttl = await r.ttl(f"sala:{sala_id}")
+                sala["tiempo_restante"] = ttl if ttl > 0 else None
+
+                salas.append(sala)
     salas.sort(key=lambda x: x.get("fecha_creacion", ""), reverse=True)
     return {"salas": salas}
 
@@ -201,3 +252,107 @@ async def obtener_usuario(user_id: str):
     decoded_data["id"] = user_id
     
     return decoded_data
+
+async def eliminar_sala_completa(sala_id: str, solicitante_id: str):
+    """
+    Elimina una sala completamente y todas sus referencias si el solicitante es el creador.
+    
+    Args:
+        sala_id (str): ID de la sala a eliminar
+        solicitante_id (str): ID del usuario que solicita la eliminación
+        
+    Returns:
+        dict: Mensaje de confirmación
+    Raises:
+        Exception: Si hay errores en la validación o eliminación
+    """
+    # 1. Verificar que la sala existe y el solicitante es el creador
+    sala_key = f"sala:{sala_id}"
+    datos_sala = await r.hgetall(sala_key)
+    
+    if not datos_sala:
+        raise Exception("La sala no existe")
+    
+    sala = {k.decode(): v.decode() for k, v in datos_sala.items()}
+    
+    if sala["creador_id"] != solicitante_id:
+        raise Exception("Solo el creador puede eliminar la sala")
+
+    try:
+        # 2. Obtener todos los usuarios de la sala
+        sala_usuarios_key = f"sala:{sala_id}:usuarios"
+        usuarios = await r.smembers(sala_usuarios_key)
+        
+        # 3. Para cada usuario, eliminar la referencia a esta sala de su set de salas
+        for usuario_bytes in usuarios:
+            usuario_id = usuario_bytes.decode().split(":")[1]
+            usuario_salas_key = f"usuario:{usuario_id}:salas"
+            await safe_srem(r, usuario_salas_key, sala_key)
+            print(f"✅ Eliminada referencia de sala en usuario {usuario_id}")
+
+        # 4. Eliminar el set de usuarios de la sala
+        await r.delete(sala_usuarios_key)
+        print(f"✅ Eliminado set de usuarios de la sala {sala_id}")
+
+        # 5. Eliminar el historial de mensajes de la sala
+        mensajes_key = f"sala:{sala_id}:mensajes"
+        await r.delete(mensajes_key)
+        print(f"✅ Eliminado historial de mensajes de la sala {sala_id}")
+
+        # 6. Finalmente, eliminar la sala en sí
+        await r.delete(sala_key)
+        print(f"✅ Eliminada sala {sala_id}")
+
+        return {
+            "mensaje": "Sala eliminada completamente",
+            "sala_id": sala_id,
+            "usuarios_afectados": len(usuarios)
+        }
+
+    except Exception as e:
+        print(f"❌ Error eliminando sala: {str(e)}")
+        raise Exception(f"Error al eliminar la sala: {str(e)}")
+
+async def obtener_detalles_sala(sala_id: str):
+    """
+    Obtiene todos los detalles de una sala específica.
+    
+    Args:
+        sala_id (str): ID de la sala a consultar
+        
+    Returns:
+        dict: Datos completos de la sala
+    Raises:
+        Exception: Si la sala no existe
+    """
+    sala_key = f"sala:{sala_id}"
+    
+    # Verificar que la sala existe
+    datos = await r.hgetall(sala_key)
+    if not datos:
+        raise Exception("La sala no existe")
+    
+    # Convertir los datos de bytes a un diccionario
+    sala = {k.decode(): v.decode() for k, v in datos.items()}
+    
+    # Añadir el ID de la sala al resultado
+    sala["id"] = sala_id
+    
+    # Convertir valores booleanos y numéricos
+    sala["es_publica"] = sala["es_publica"] == "1"
+    if "tiempo_vida" in sala:
+        sala["tiempo_vida"] = int(sala["tiempo_vida"]) if sala["tiempo_vida"] else None
+    
+    # Eliminar datos sensibles
+    if "password_hash" in sala:
+        del sala["password_hash"]
+        # Obtener TTL restante en segundos
+    ttl = await r.ttl(sala_key)
+
+    if ttl >= 0:
+        sala["tiempo_restante"] = ttl
+    else:
+        sala["tiempo_restante"] = None  # No tiene expiración activa
+
+
+    return sala

@@ -36,50 +36,261 @@ body {
   background-color: #1f1f1f;
 }
 
-.salas-lista,
-.salas-lista-popular {
+.salas-lista {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 15px;
+  padding: 15px;
+  background: #333;
+  border-radius: 12px;
+  margin-top: 10px;
 }
 
 .sala {
   background: #3a3a3a;
-  padding: 10px;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px #000;
+  padding: 15px;
+  border-radius: 10px;
+  transition: all 0.3s ease;
+  border: 1px solid #444;
+  position: relative;
+  overflow: hidden;
+}
+
+.sala:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  border-color: #ff6b6b;
+}
+
+.sala strong {
+  font-size: 1.1em;
+  color: #fff;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.sala p {
+  color: #aaa;
+  margin: 5px 0;
+  font-size: 0.9em;
+}
+
+.sala .sala-meta {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #444;
+  font-size: 0.85em;
+  color: #888;
+}
+
+.sala .sala-meta span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.sala .sala-meta span::before {
+  content: "•";
+  color: #ff6b6b;
+}
+
+.sala .sala-acciones {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
 }
 
 .sala button {
-  margin-top: 8px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.9em;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: #444;
+  color: white;
+}
+
+.sala button.btn-entrar {
+  background: #ff6b6b;
+}
+
+.sala button.btn-eliminar {
+  background: #444;
+}
+
+.sala button:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+}
+
+.sala button.btn-entrar:hover {
+  background: #ff3b3b;
+}
+
+.sala button.btn-eliminar:hover {
+  background: #d32f2f;
+}
+
+.sidebar h3 {
+  color: #fff;
+  font-size: 1.2em;
+  margin: 20px 0 10px;
+  padding-left: 15px;
+  position: relative;
+}
+
+.sidebar h3::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 20px;
+  background: #ff6b6b;
+  border-radius: 2px;
+}
+
+/* Mensaje cuando no hay salas */
+.no-salas {
+  text-align: center;
+  padding: 30px;
+  color: #888;
+  font-style: italic;
+  background: #333;
+  border-radius: 12px;
+  margin-top: 10px;
+}
+
+.no-salas p {
+  margin: 0;
+  font-size: 0.9em;
 }
 
 .crear-sala {
-  margin-top: 20px;
+  background-color: #333;
+  padding: 25px;
+  border-radius: 16px;
+  margin: 20px 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid #3a3a3a;
+  transition: all 0.3s ease;
 }
 
-input, textarea {
-  width: 100%;
-  margin: 4px 0;
-  padding: 8px;
-  border-radius: 4px;
-  background: #333;
-  color: white;
-  border: none;
+.crear-sala:hover {
+  border-color: #ff6b6b;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
 }
 
-button {
+.crear-sala h4 {
+  color: #fff;
+  font-size: 1.2em;
+  margin: 0 0 20px 0;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #3a3a3a;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.crear-sala h4::before {
+  content: "+";
   background-color: #ff6b6b;
   color: white;
-  padding: 8px 16px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2em;
 }
 
-button:hover {
-  background-color: #ff3b3b;
+.crear-sala input,
+.crear-sala textarea {
+  width: 100%;
+  padding: 12px 16px;
+  margin: 8px 0;
+  border: none;
+  border-radius: 8px;
+  background-color: #2a2a2a;
+  color: white;
+  font-size: 0.95em;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
 }
+
+.crear-sala input:focus,
+.crear-sala textarea:focus {
+  outline: none;
+  background-color: #404040;
+  box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.3);
+}
+
+.crear-sala textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.crear-sala button {
+  background-color: #ff6b6b;
+  color: white;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 25px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 1em;
+  margin-top: 15px;
+  width: 100%;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.crear-sala button:hover {
+  background-color: #ff3b3b;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.2);
+}
+
+.crear-sala button:active {
+  transform: translateY(0);
+}
+
+/* Añadir icono al botón */
+.crear-sala button::before {
+  content: "+";
+  font-size: 1.2em;
+  font-weight: bold;
+}
+
+/* Estilos para los campos de entrada */
+.input-group {
+  margin-bottom: 15px;
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: #aaa;
+  font-size: 0.9em;
+}
+
+.input-group small {
+  display: block;
+  margin-top: 5px;
+  color: #888;
+  font-size: 0.8em;
+}
+
 .datos-usuario {
   background-color: #f5f5f5;
   padding: 15px;
@@ -96,4 +307,110 @@ button:hover {
 .datos-usuario p {
   margin: 5px 0;
   color: #666;
+}
+
+.user-profile {
+  background-color: #333;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 25px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.user-profile-header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.user-avatar {
+  width: 60px;
+  height: 60px;
+  background-color: #ff6b6b;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: bold;
+  color: white;
+  text-transform: uppercase;
+}
+
+.user-details {
+  flex-grow: 1;
+}
+
+.user-name {
+  margin: 0;
+  font-size: 1.2em;
+  color: #fff;
+}
+
+.user-email {
+  color: #aaa;
+  font-size: 0.9em;
+  margin-top: 4px;
+}
+
+.user-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.85em;
+  color: #888;
+}
+
+.user-meta span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.user-meta span::before {
+  content: "•";
+  color: #ff6b6b;
+}
+
+.barra-superior .user-mini-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#cerrarSesionBtn {
+  background-color: #ff3b3b;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.9em;
+  transition: all 0.3s ease;
+}
+
+#cerrarSesionBtn:hover {
+  background-color: #ff1a1a;
+  transform: translateY(-1px);
+}
+
+.user-avatar-mini {
+  width: 32px;
+  height: 32px;
+  background-color: #ff6b6b;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: bold;
+  color: white;
+}
+
+.user-mini-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-mini-info span {
+  font-weight: 500;
 }

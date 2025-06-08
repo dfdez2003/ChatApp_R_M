@@ -8,6 +8,9 @@ class ArchivoCreate(BaseModel):
     tipo_mime: Optional[str]
     tamaño: Optional[int]
 
+    class Config:
+        from_atributes = True
+
 class ArchivoOut(BaseModel):
     id: str
     sala_id: str
@@ -19,4 +22,4 @@ class ArchivoOut(BaseModel):
     fecha: datetime
 
     class Config:
-        orm_mode = True
+        from_atributes = True

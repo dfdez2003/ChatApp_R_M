@@ -5,7 +5,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
-
+from utils.limpieza_salas import tarea_limpieza_salas
+import asyncio
 app = FastAPI()
 
 # Configuración de CORS para permitir solicitudes desde otros orígenes
@@ -24,6 +25,9 @@ async def redirect_login():
 @app.get("/register")
 async def redirect_login():
     return RedirectResponse(url="/auth/register")
+@app.on_event("startup")
+async def iniciar_tareas_background():
+    asyncio.create_task(tarea_limpieza_salas())
 
 # Incluir las rutas
 app.include_router(auth.router)  # Rutas para autenticación

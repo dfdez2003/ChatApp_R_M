@@ -35,3 +35,7 @@ async def eliminar_mensaje_router(data: MensajeDelete, user = Depends(get_curren
         return await eliminar_mensaje(data.sala_id, data.mensaje_id, user["id"])
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/{sala_id}")
+async def get_mensajes_sala(sala_id: str, user=Depends(get_current_user)):
+    return await obtener_mensajes(sala_id)

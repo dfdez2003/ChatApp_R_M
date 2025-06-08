@@ -6,6 +6,8 @@ from passlib.context import CryptContext    # sale sale libreria para hash
 from schemas.usuario import UsuarioOut
 import redis.asyncio as redis
 import logging
+from fastapi import HTTPException
+
 logger = logging.getLogger(__name__)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto") # hash 
@@ -83,3 +85,27 @@ async def logiar_usuario(data):  # data tiene: username, password
                 return UsuarioOut(**usuario_out_data)
 
     raise Exception("Usuario o contraseña incorrectos")
+
+
+
+async def obtener_usuario_por_id(usuario_id: str) -> UsuarioOut:
+    clave = f"usuario:{usuario_id}"
+
+    try:
+        # Aseguramos que sea un hash (evita WRONGTYPE error)
+        tipo = await r.type(clave)
+        if tipo.decode() != "hash":
+            raise HTTPException(status_code=500, detail=f"La clave {clave} no es un hash de usuario.")
+
+        datos = await r.hgetall(clave)
+        if not datos:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+        # Redis devuelve los valores como bytes, los convertimos a str
+        datos_decodificados = {k.decode(): v.decode() for k, v in datos.items()}
+        datos_decodificados["id"] = usuario_id
+
+        return UsuarioOut(**datos_decodificados)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener usuario: {str(e)}")

@@ -3,10 +3,22 @@
 from fastapi import APIRouter, Depends, HTTPException
 from schemas.sala import SalaCreate, ExpulsionData
 from fastapi.responses import HTMLResponse, FileResponse
-from services.sala import crear_sala, unirse_a_sala, mostrar_salas_propias, mostrar_salas_random, expulsar_usuario
+from services.sala import (
+    crear_sala, 
+    unirse_a_sala, 
+    mostrar_salas_propias, 
+    mostrar_salas_random, 
+    expulsar_usuario,
+    eliminar_sala_completa,
+    obtener_detalles_sala
+)
 from utils.auth import get_current_user  # esta función saca el user del token
+from pydantic import BaseModel
 
 from schemas.sala import UnirseSala
+
+class EliminarSalaData(BaseModel):
+    sala_id: str
 
 router = APIRouter(prefix="/salas", tags=["salas"])
 
@@ -14,7 +26,22 @@ router = APIRouter(prefix="/salas", tags=["salas"])
 async def get_salas_page():
     return "static/salas.html"
 
+@router.get("/detalles/{sala_id}")
+async def get_detalles_sala(sala_id: str, user = Depends(get_current_user)):
+    """
+    Obtiene los detalles completos de una sala específica.
+    """
+    try:
+        return await obtener_detalles_sala(sala_id)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
+@router.get("/ver/{sala_id}", response_class=FileResponse)
+async def ver_sala_page(sala_id: str):
+    """
+    Sirve la página HTML para ver los detalles de una sala.
+    """
+    return "static/datosala.html"
 
 @router.post("/create")
 async def crear_sala_endpoint(
@@ -50,10 +77,22 @@ async def salas_random(user = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail=str(e))
     
 
-@router.post("/expulsar")
-async def expulsar(data: ExpulsionData, user = Depends(get_current_user)):
+#@router.post("/expulsar")
+#async def expulsar(data: ExpulsionData, user = Depends(get_current_user)):
+#    try:
+#        return await expulsar_usuario(data.sala_id, data.usuario_id, user["id"])
+#    except Exception as e:
+#        raise HTTPException(status_code=400, detail=str(e))
+    
+
+@router.post("/eliminar")
+async def eliminar_sala(data: EliminarSalaData, user = Depends(get_current_user)):
+    """
+    Elimina una sala completamente y todas sus referencias.
+    Solo el creador de la sala puede eliminarla.
+    """
     try:
-        return await expulsar_usuario(data.sala_id, data.usuario_id, user["id"])
+        return await eliminar_sala_completa(data.sala_id, user["id"])
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     

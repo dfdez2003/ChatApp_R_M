@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Detalles de Sala - EphemerChat</title>
+  <link rel="stylesheet" href="/static/css/datosala.css" />
+</head>
+<body>
+  <div class="container">
+    <header class="sala-header">
+      <button onclick="window.location.href='/salas/'" class="back-button">
+        Volver a Salas
+      </button>
+      <h1>Detalles de la Sala</h1>
+    </header>
+
+    <main class="sala-details">
+      <div class="sala-card">
+        <div class="sala-info-header">
+          <div class="sala-avatar" id="sala-avatar"></div>
+          <div class="sala-basic-info">
+            <h2 id="sala-nombre">Cargando...</h2>
+            <span id="sala-tipo" class="sala-badge">Tipo</span>
+          </div>
+        </div>
+
+        <div class="info-section">
+          <h3>Descripción</h3>
+          <p id="sala-descripcion">Cargando descripción...</p>
+        </div>
+
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="info-label">Creador</span>
+            <span id="sala-creador" class="info-value">Cargando...</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Fecha de Creación</span>
+            <span id="sala-fecha" class="info-value">Cargando...</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Tiempo de Vida</span>
+            <span id="sala-tiempo-vida" class="info-value">Cargando...</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Estado</span>
+            <span id="sala-estado" class="info-value">Cargando...</span>
+          </div>
+        </div>
+
+        <div class="sala-actions">
+          <button id="btn-unirse" class="action-button join">Unirse a la Sala</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/js/datosala.js"></script>
+</body>
+</html>
