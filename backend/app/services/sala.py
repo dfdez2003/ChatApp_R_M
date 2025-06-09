@@ -5,7 +5,7 @@ from datetime import datetime
 from passlib.context import CryptContext
 import redis.asyncio as redis
 from fastapi import HTTPException
-from db.mongodb import salas_collection, mensajes_collection
+from db.mongodb import salas_collection_maestro, mensajes_collection_maestro
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 r = redis.Redis()
 
@@ -66,7 +66,7 @@ async def crear_sala(data, creador_id: str):
     }
 
     try:
-        await salas_collection.insert_one(mongo_data)
+        await salas_collection_maestro.insert_one(mongo_data)
         print(f"[DEBUG] Sala insertada en MongoDB: {sala_id}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al insertar en MongoDB: {str(e)}")
@@ -130,7 +130,7 @@ async def unirse_a_sala(data, user_id: str):
     await safe_add_usuario_sala(r, data.sala_id, f"usuario:{user_id}")
 
     # Añadir usuario a la sala
-    await salas_collection.update_one(
+    await salas_collection_maestro.update_one(
         {"_id": data.sala_id},
         {"$addToSet": {"usuarios": user_id}}
     )
@@ -263,14 +263,14 @@ async def eliminar_sala_completa(sala_id: str, solicitante_id: str):
         print(f"✅ Sala {sala_id} eliminada completamente de Redis")
 
         # 2. MongoDB: eliminar documento de la sala
-        resultado = await salas_collection.delete_one({"_id": sala_id})
+        resultado = await salas_collection_maestro.delete_one({"_id": sala_id})
         if resultado.deleted_count:
             print(f"✅ Documento de sala eliminado en MongoDB: {sala_id}")
         else:
             print(f"⚠️ Sala no encontrada en MongoDB con _id: {sala_id}")
 
         # 3. MongoDB: eliminar mensajes relacionados con esa sala (si aplicas esa colección)
-        result_msg = await mensajes_collection.delete_many({"sala_id": sala_id})
+        result_msg = await mensajes_collection_maestro.delete_many({"sala_id": sala_id})
         print(f"✅ Eliminados {result_msg.deleted_count} mensajes en MongoDB")
 
         return {

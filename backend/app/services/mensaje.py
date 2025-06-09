@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from schemas.mensaje import MensajeOut, MensajeIn
 from services.usuario import obtener_usuario_por_id  # importante
-from db.mongodb import mensajes_collection, usuarios_collection
+from db.mongodb import mensajes_collection_maestro, usuarios_collection_maestro
 r = redis.Redis()
 
 MAX_MENSAJES = 50
@@ -14,7 +14,7 @@ async def guardar_mensaje(data: MensajeIn, usuario_id: str) -> MensajeOut:
     mensaje_id = str(uuid.uuid4())
 
     # Obtener username desde Mongo
-    usuario = await usuarios_collection.find_one({"_id": usuario_id})
+    usuario = await usuarios_collection_maestro.find_one({"_id": usuario_id})
     if not usuario:
         raise Exception("Usuario no encontrado")
 
@@ -26,7 +26,7 @@ async def guardar_mensaje(data: MensajeIn, usuario_id: str) -> MensajeOut:
         "fecha": fecha
     }
 
-    await mensajes_collection.insert_one(mensaje_doc)
+    await mensajes_collection_maestro.insert_one(mensaje_doc)
 
     return MensajeOut(
         id=mensaje_id,
@@ -38,13 +38,13 @@ async def guardar_mensaje(data: MensajeIn, usuario_id: str) -> MensajeOut:
     )
 
 async def obtener_mensajes(sala_id: str, limite: int = 50) -> list[MensajeOut]:
-    cursor = mensajes_collection.find(
+    cursor = mensajes_collection_maestro.find(
         {"sala_id": sala_id}
     ).sort("fecha", -1).limit(limite)
 
     mensajes = []
     async for doc in cursor:
-        usuario = await usuarios_collection.find_one({"_id": doc["usuario_id"]})
+        usuario = await usuarios_collection_maestro.find_one({"_id": doc["usuario_id"]})
         mensajes.append(MensajeOut(
             id=doc["_id"],
             usuario_id=doc["usuario_id"],
