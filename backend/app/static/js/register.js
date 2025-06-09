@@ -28,7 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await response.json();
       if (response.ok) {
          // Mostrar mensaje y redirigir después de 2 segundos
-         alert("¡Registro exitoso! Serás redirigido al login...");
+         // alert("¡Registro exitoso! Serás redirigido al login...");
          console.log("Respuesta del servidor:", data);
          setTimeout(()=> {
           window.location.href = "/auth/login"; // ruta relativa 

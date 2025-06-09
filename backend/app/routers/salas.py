@@ -8,7 +8,6 @@ from services.sala import (
     unirse_a_sala, 
     mostrar_salas_propias, 
     mostrar_salas_random, 
-    expulsar_usuario,
     eliminar_sala_completa,
     obtener_detalles_sala
 )

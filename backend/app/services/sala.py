@@ -5,7 +5,7 @@ from datetime import datetime
 from passlib.context import CryptContext
 import redis.asyncio as redis
 from fastapi import HTTPException
-
+from db.mongodb import salas_collection, mensajes_collection
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 r = redis.Redis()
 
@@ -41,61 +41,59 @@ def hash_password(password: str) -> str:
 
 # Crear sala blindado
 async def crear_sala(data, creador_id: str):
-    # 🆔 Generamos un ID único para la sala
     sala_id = str(uuid.uuid4())
     fecha = datetime.utcnow().isoformat()
-    password_hash = ""
-    if data.password:
-        password_hash = pwd_context.hash(data.password)
-    
+    password_hash = hash_password(data.password) if data.password else ""
     es_publica = "0" if password_hash else "1"
+
     sala_hash_key = f"sala:{sala_id}"
     sala_usuarios_key = f"sala:{sala_id}:usuarios"
     usuario_salas_key = f"usuario:{creador_id}:salas"
     usuario_key = f"usuario:{creador_id}"
 
     print(f"[DEBUG] Iniciando creación de sala {sala_id}")
-    print(f"[DEBUG] -> HSET en {sala_hash_key}")
-    print(f"[DEBUG] -> SET de usuarios en {sala_usuarios_key}")
-    print(f"[DEBUG] -> SET de salas del usuario en {usuario_salas_key}")
 
-    # ✅ Validar que no exista otra clave con tipo incompatible
+    # === Inserción MongoDB ===
+    mongo_data = {
+        "_id": sala_id,
+        "nombre": data.nombre,
+        "descripcion": data.descripcion or "",
+        "tiempo_vida": int(data.tiempo_vida) if data.tiempo_vida else 2,
+        "creador_id": creador_id,
+        "es_publica": es_publica == "1",
+        "password_hash": password_hash,
+        "fecha_creacion": datetime.utcnow()
+    }
+
+    try:
+        await salas_collection.insert_one(mongo_data)
+        print(f"[DEBUG] Sala insertada en MongoDB: {sala_id}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al insertar en MongoDB: {str(e)}")
+
+    # === Validación e Inserción Redis ===
     tipo_sala = await r.type(sala_hash_key)
     if tipo_sala != b"none" and tipo_sala != b"hash":
         raise Exception(f"Conflicto de tipo: {sala_hash_key} ya existe como {tipo_sala}")
 
-    # 📝 Crear sala como HASH
     await r.hset(sala_hash_key, mapping={
         "nombre": data.nombre,
         "descripcion": data.descripcion or "",
         "tiempo_vida": str(data.tiempo_vida) if data.tiempo_vida else "0",
         "creador_id": creador_id,
-        "es_publica": "1" if not data.password else "0",
+        "es_publica": es_publica,
         "password_hash": password_hash,
         "fecha_creacion": fecha,
     })
 
-    # ✅ Agregar la sala al set del usuario (relación inversa)
-    tipo_user_salas = await r.type(usuario_salas_key)
-    if tipo_user_salas != b"none" and tipo_user_salas != b"set":
-        raise Exception(f"Conflicto de tipo en {usuario_salas_key}: tipo {tipo_user_salas}")
-    await r.sadd(usuario_salas_key, sala_hash_key)
-    print(f"[DEBUG] Añadida sala a {usuario_salas_key} → {sala_hash_key}")
+    await safe_add_sala_usuario(r, creador_id, sala_hash_key)
+    await safe_add_usuario_sala(r, sala_id, usuario_key)
 
-    # ✅ Agregar el usuario al set de usuarios de la sala
-    tipo_sala_usuarios = await r.type(sala_usuarios_key)
-    if tipo_sala_usuarios != b"none" and tipo_sala_usuarios != b"set":
-        raise Exception(f"Conflicto de tipo en {sala_usuarios_key}: tipo {tipo_sala_usuarios}")
-    await r.sadd(sala_usuarios_key, usuario_key)
-    print(f"[DEBUG] Añadido usuario a {sala_usuarios_key} → {usuario_key}")
-    # ⏳ Establecer tiempo de vida (TTL) para la sala y sus mensajes
     try:
-        tiempo_vida = int(data.tiempo_vida) if data.tiempo_vida else 2  # horas
-        segundos = tiempo_vida * 3600
-
-        await r.expire(sala_hash_key, segundos)                  # expira la sala como hash
-        await r.expire(f"sala:{sala_id}:usuarios", segundos)     # expira set de usuarios
-        await r.expire(f"sala:{sala_id}:mensajes", segundos)     # expira historial de mensajes
+        segundos = int(data.tiempo_vida or 2) * 3600
+        await r.expire(sala_hash_key, segundos)
+        await r.expire(sala_usuarios_key, segundos)
+        await r.expire(f"sala:{sala_id}:mensajes", segundos)
         print(f"[DEBUG] TTL de sala establecido a {segundos} segundos")
     except Exception as e:
         print(f"[ERROR] No se pudo establecer TTL: {str(e)}")
@@ -105,8 +103,9 @@ async def crear_sala(data, creador_id: str):
         "nombre": data.nombre,
         "creador_id": creador_id,
         "fecha_creacion": fecha,
-        "es_publica": data.es_publica
+        "es_publica": es_publica == "1"
     }
+
 
 async def unirse_a_sala(data, user_id: str):
     sala_key = f"sala:{data.sala_id}"
@@ -117,50 +116,27 @@ async def unirse_a_sala(data, user_id: str):
     sala_data = await r.hgetall(sala_key)
     sala_dict = {k.decode(): v.decode() for k, v in sala_data.items()}
 
-    # Verificación para salas privadas (con contraseña)
     if sala_dict.get("es_publica") == "0":
         if not data.password:
             raise HTTPException(status_code=403, detail="Se requiere contraseña")
         if not pwd_context.verify(data.password, sala_dict.get("password_hash", "")):
             raise HTTPException(status_code=403, detail="Contraseña incorrecta")
 
-    # Verificación si el usuario ya está en la sala
     ya_esta = await r.sismember(f"sala:{data.sala_id}:usuarios", f"usuario:{user_id}")
     if ya_esta:
         return {"mensaje": "Ya estás en la sala"}
 
-    # Agregar relaciones cruzadas (usuario ↔ sala)
     await safe_add_sala_usuario(r, user_id, f"sala:{data.sala_id}")
     await safe_add_usuario_sala(r, data.sala_id, f"usuario:{user_id}")
 
-    return {"mensaje": "Te uniste a la sala", "sala_id": data.sala_id}
-
-async def unirse_a_sala2(data, user_id: str):
-    sala_key = f"sala:{data.sala_id}"
-
-    if not await r.exists(sala_key):
-        raise Exception("La sala no existe")
-
-    sala_data = await r.hgetall(sala_key)
-    sala_dict = {k.decode(): v.decode() for k, v in sala_data.items()}
-
-    # Verificación para salas privadas (con contraseña)
-    if sala_dict["es_publica"] == "0":
-        if not data.password:
-            raise Exception("Se requiere contraseña")
-        if not pwd_context.verify(data.password, sala_dict["password_hash"]):
-            raise Exception("Contraseña incorrecta")
-
-    # Verificación si el usuario ya está en la sala
-    ya_esta = await r.sismember(f"sala:{data.sala_id}:usuarios", f"usuario:{user_id}")
-    if ya_esta:
-        return {"mensaje": "Ya estás en la sala"}
-
-    # Agregar la sala al set de salas del usuario y el usuario al set de usuarios de la sala
-    await safe_add_sala_usuario(r, user_id, f"sala:{data.sala_id}")
-    await safe_add_usuario_sala(r, data.sala_id, f"usuario:{user_id}")
+    # Añadir usuario a la sala
+    await salas_collection.update_one(
+        {"_id": data.sala_id},
+        {"$addToSet": {"usuarios": user_id}}
+    )
 
     return {"mensaje": "Te uniste a la sala", "sala_id": data.sala_id}
+
 
 
 #  Expulsar usuario blindado
@@ -253,55 +229,49 @@ async def obtener_usuario(user_id: str):
     
     return decoded_data
 
+
 async def eliminar_sala_completa(sala_id: str, solicitante_id: str):
     """
     Elimina una sala completamente y todas sus referencias si el solicitante es el creador.
-    
-    Args:
-        sala_id (str): ID de la sala a eliminar
-        solicitante_id (str): ID del usuario que solicita la eliminación
-        
-    Returns:
-        dict: Mensaje de confirmación
-    Raises:
-        Exception: Si hay errores en la validación o eliminación
+    Se elimina de Redis (tiempo real) y MongoDB (persistencia).
     """
-    # 1. Verificar que la sala existe y el solicitante es el creador
     sala_key = f"sala:{sala_id}"
     datos_sala = await r.hgetall(sala_key)
     
     if not datos_sala:
         raise Exception("La sala no existe")
-    
+
     sala = {k.decode(): v.decode() for k, v in datos_sala.items()}
     
     if sala["creador_id"] != solicitante_id:
         raise Exception("Solo el creador puede eliminar la sala")
 
     try:
-        # 2. Obtener todos los usuarios de la sala
+        # 1. Redis: eliminar referencias cruzadas
         sala_usuarios_key = f"sala:{sala_id}:usuarios"
         usuarios = await r.smembers(sala_usuarios_key)
-        
-        # 3. Para cada usuario, eliminar la referencia a esta sala de su set de salas
+
         for usuario_bytes in usuarios:
             usuario_id = usuario_bytes.decode().split(":")[1]
             usuario_salas_key = f"usuario:{usuario_id}:salas"
             await safe_srem(r, usuario_salas_key, sala_key)
             print(f"✅ Eliminada referencia de sala en usuario {usuario_id}")
 
-        # 4. Eliminar el set de usuarios de la sala
         await r.delete(sala_usuarios_key)
-        print(f"✅ Eliminado set de usuarios de la sala {sala_id}")
-
-        # 5. Eliminar el historial de mensajes de la sala
-        mensajes_key = f"sala:{sala_id}:mensajes"
-        await r.delete(mensajes_key)
-        print(f"✅ Eliminado historial de mensajes de la sala {sala_id}")
-
-        # 6. Finalmente, eliminar la sala en sí
+        await r.delete(f"sala:{sala_id}:mensajes")
         await r.delete(sala_key)
-        print(f"✅ Eliminada sala {sala_id}")
+        print(f"✅ Sala {sala_id} eliminada completamente de Redis")
+
+        # 2. MongoDB: eliminar documento de la sala
+        resultado = await salas_collection.delete_one({"_id": sala_id})
+        if resultado.deleted_count:
+            print(f"✅ Documento de sala eliminado en MongoDB: {sala_id}")
+        else:
+            print(f"⚠️ Sala no encontrada en MongoDB con _id: {sala_id}")
+
+        # 3. MongoDB: eliminar mensajes relacionados con esa sala (si aplicas esa colección)
+        result_msg = await mensajes_collection.delete_many({"sala_id": sala_id})
+        print(f"✅ Eliminados {result_msg.deleted_count} mensajes en MongoDB")
 
         return {
             "mensaje": "Sala eliminada completamente",
@@ -312,6 +282,7 @@ async def eliminar_sala_completa(sala_id: str, solicitante_id: str):
     except Exception as e:
         print(f"❌ Error eliminando sala: {str(e)}")
         raise Exception(f"Error al eliminar la sala: {str(e)}")
+
 
 async def obtener_detalles_sala(sala_id: str):
     """
@@ -356,3 +327,42 @@ async def obtener_detalles_sala(sala_id: str):
 
 
     return sala
+
+
+async def crear_sala_redis(
+    sala_id: str,
+    nombre: str,
+    descripcion: str,
+    creador_id: str,
+    es_publica: bool,
+    password_hash: str,
+    tiempo_vida_segundos: int,
+    fecha_creacion: datetime,
+    usuarios: list
+):
+    sala_key = f"sala:{sala_id}"
+    sala_usuarios_key = f"sala:{sala_id}:usuarios"
+    creador_salas_key = f"usuario:{creador_id}:salas"
+
+    # Hash principal
+    await r.hset(sala_key, mapping={
+        "nombre": nombre,
+        "descripcion": descripcion,
+        "tiempo_vida": str(tiempo_vida_segundos),
+        "creador_id": creador_id,
+        "es_publica": "1" if es_publica else "0",
+        "password_hash": password_hash,
+        "fecha_creacion": fecha_creacion.isoformat()
+    })
+
+    # Agregar usuarios al set de la sala
+    for uid in usuarios:
+        await r.sadd(sala_usuarios_key, f"usuario:{uid}")
+        await r.sadd(f"usuario:{uid}:salas", sala_key)
+
+    # Establecer expiración
+    await r.expire(sala_key, tiempo_vida_segundos)
+    await r.expire(sala_usuarios_key, tiempo_vida_segundos)
+    await r.expire(f"sala:{sala_id}:mensajes", tiempo_vida_segundos)
+
+    return {"mensaje": "Sala creada en Redis", "sala_id": sala_id}

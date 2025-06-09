@@ -2,110 +2,117 @@
 
 import uuid
 from datetime import datetime
-from passlib.context import CryptContext    # sale sale libreria para hash
-from schemas.usuario import UsuarioOut
+from passlib.context import CryptContext
+from schemas.usuario import UsuarioOut, UsuarioCreate, UsuarioLogin
 import redis.asyncio as redis
 import logging
 from fastapi import HTTPException
+from db.mongodb import usuarios_collection
+from services.transaccion import crear_usuario_y_sala_mongo
+from  services.sala import crear_sala_redis
 
 logger = logging.getLogger(__name__)
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto") # hash 
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 r = redis.Redis()
 
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
 async def crear_usuario(data):
-    async for key in r.scan_iter(match="usuario:*"):
-        tipo = await r.type(key)
+    data_obj = UsuarioCreate(**data.dict()) if hasattr(data, "dict") else UsuarioCreate(**data)
 
-        # ✅ Validar que sea HASH antes de hacer HGET
-        if tipo != b"hash":
-            print(f"[DEBUG] Ignorando clave {key.decode()} de tipo {tipo.decode()}")
-            continue
+    # Verificar correo duplicado
+    existing = await usuarios_collection.find_one({"email": data_obj.email})
+    if existing:
+        raise Exception("Correo ya registrado")
 
-        email = await r.hget(key, "email")
-        if email and email.decode() == data.email:
-            raise Exception("Correo ya registrado")
+    # Ejecutar transacción MongoDB
+    resultado = await crear_usuario_y_sala_mongo(data_obj)
+    if not resultado["ok"]:
+        raise Exception("Error al crear usuario en MongoDB")
 
-    usuario_id = str(uuid.uuid4())
-    fecha = datetime.utcnow().isoformat()
-    hashed = hash_password(data.password)
+    usuario_id = resultado["usuario_id"]
+    sala_id = resultado["sala_id"]
+    fecha = resultado["fecha"]
+    hashed = resultado["password_hash"]
 
+    # Redis: Crear usuario
     usuario_hash_key = f"usuario:{usuario_id}"
     tipo = await r.type(usuario_hash_key)
     if tipo != b"none" and tipo != b"hash":
-        raise Exception(f"Conflicto de tipo en {usuario_hash_key}. Ya existe con tipo {tipo.decode()}")
+        raise Exception(f"Conflicto de tipo en {usuario_hash_key}. Ya existe como {tipo.decode()}")
 
     await r.hset(usuario_hash_key, mapping={
-        "nombre": data.nombre,
-        "surname": data.surname,
-        "username": data.username,
-        "email": data.email,
+        "nombre": data_obj.nombre,
+        "surname": data_obj.surname,
+        "username": data_obj.username,
+        "email": data_obj.email,
         "password_hash": hashed,
-        "fecha_registro": fecha
+        "fecha_registro": fecha.isoformat()  # ✅ Aquí sí lo convertimos
     })
 
-    print(f"[DEBUG] Usuario creado en {usuario_hash_key}")
+    # Redis: Crear sala
+    await crear_sala_redis(
+        sala_id=sala_id,
+        nombre="Sala personal",
+        descripcion=f"Sala de {data_obj.username}",
+        creador_id=usuario_id,
+        es_publica=True,
+        password_hash="",
+        tiempo_vida_segundos=7200,
+        fecha_creacion=fecha,  # ✅ Pasa como datetime
+        usuarios=[usuario_id]
+    )
+
+    logger.info(f"[DEBUG] Usuario y sala creados en Redis y Mongo: {usuario_id} | Sala: {sala_id}")
 
     return {
         "id": usuario_id,
-        "nombre": data.nombre,
-        "email": data.email,
-        "fecha_registro": fecha
+        "nombre": data_obj.nombre,
+        "email": data_obj.email,
+        "fecha_registro": fecha.isoformat()
     }
 
-    
-async def logiar_usuario(data):  # data tiene: username, password
-    async for key in r.scan_iter(match="usuario:*"):
-        tipo = await r.type(key)
-        
-        if tipo != b"hash":
-            continue  
+async def logiar_usuario(data: UsuarioLogin):
+    usuario = await usuarios_collection.find_one({"username": data.username})
+    if not usuario:
+        raise Exception("Usuario o contraseña incorrectos")
 
-        username = await r.hget(key, "username")
-        if username and username.decode() == data.username:
-            password_hash = await r.hget(key, "password_hash")
-            if password_hash and pwd_context.verify(data.password, password_hash.decode()):
-                datos = await r.hgetall(key)
-                usuario_dict = {k.decode(): v.decode() for k, v in datos.items()}
-                 # Log de depuración
-                print("\n[DEBUG] Datos del usuario desde Redis:", usuario_dict)
-                usuario_out_data = {
-                    "id": key.decode().split(":")[1],
-                    "nombre": usuario_dict.get("nombre"),
-                    "surname": usuario_dict.get("surname"),
-                    "username": usuario_dict.get("username"),
-                    "email": usuario_dict.get("email"),
-                    "fecha_registro": usuario_dict.get("fecha_registro"),
-                }
-                # Log del objeto de salida
-                print("[DEBUG] Objeto de salida:", usuario_out_data)
-                return UsuarioOut(**usuario_out_data)
+    if not pwd_context.verify(data.password, usuario["password_hash"]):
+        raise Exception("Usuario o contraseña incorrectos")
 
-    raise Exception("Usuario o contraseña incorrectos")
+    usuario_out_data = {
+        "id": usuario["_id"],
+        "nombre": usuario["nombre"],
+        "surname": usuario["surname"],
+        "username": usuario["username"],
+        "email": usuario["email"],
+        "fecha_registro": usuario["fecha_registro"].isoformat()
+            if isinstance(usuario["fecha_registro"], datetime)
+            else usuario["fecha_registro"]
+    }
 
+    logger.debug(f"[DEBUG] Usuario autenticado: {usuario_out_data}")
+    return UsuarioOut(**usuario_out_data)
 
 
 async def obtener_usuario_por_id(usuario_id: str) -> UsuarioOut:
-    clave = f"usuario:{usuario_id}"
-
     try:
-        # Aseguramos que sea un hash (evita WRONGTYPE error)
-        tipo = await r.type(clave)
-        if tipo.decode() != "hash":
-            raise HTTPException(status_code=500, detail=f"La clave {clave} no es un hash de usuario.")
-
-        datos = await r.hgetall(clave)
-        if not datos:
+        usuario = await usuarios_collection.find_one({"_id": usuario_id})
+        if not usuario:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-        # Redis devuelve los valores como bytes, los convertimos a str
-        datos_decodificados = {k.decode(): v.decode() for k, v in datos.items()}
-        datos_decodificados["id"] = usuario_id
+        usuario_out_data = {
+            "id": usuario["_id"],
+            "nombre": usuario["nombre"],
+            "surname": usuario["surname"],
+            "username": usuario["username"],
+            "email": usuario["email"],
+            "fecha_registro": usuario["fecha_registro"].isoformat() if isinstance(usuario["fecha_registro"], datetime) else usuario["fecha_registro"]
+        }
 
-        return UsuarioOut(**datos_decodificados)
+        return UsuarioOut(**usuario_out_data)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al obtener usuario: {str(e)}")

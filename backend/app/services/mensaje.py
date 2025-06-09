@@ -4,61 +4,57 @@ import uuid
 from datetime import datetime
 from schemas.mensaje import MensajeOut, MensajeIn
 from services.usuario import obtener_usuario_por_id  # importante
-
+from db.mongodb import mensajes_collection, usuarios_collection
 r = redis.Redis()
 
 MAX_MENSAJES = 50
 
-# ✅ Guardar nuevo mensaje (usa lista para mantener orden y limitar tamaño)
 async def guardar_mensaje(data: MensajeIn, usuario_id: str) -> MensajeOut:
+    fecha = datetime.utcnow()
     mensaje_id = str(uuid.uuid4())
-    fecha = datetime.utcnow().isoformat()
 
-    usuario = await obtener_usuario_por_id(usuario_id)
+    # Obtener username desde Mongo
+    usuario = await usuarios_collection.find_one({"_id": usuario_id})
+    if not usuario:
+        raise Exception("Usuario no encontrado")
 
-    mensaje = {
-        "id": mensaje_id,
+    mensaje_doc = {
+        "_id": mensaje_id,
         "usuario_id": usuario_id,
         "sala_id": data.sala_id,
         "contenido": data.contenido,
-        "fecha": fecha,
-        "username": usuario.username
+        "fecha": fecha
     }
 
-    clave = f"sala:{data.sala_id}:mensajes"
+    await mensajes_collection.insert_one(mensaje_doc)
 
-    # Verifica tipo para evitar corrupción si antes era hash
-    tipo = await r.type(clave)
-    if tipo not in [b"none", b"list"]:
-        raise Exception("Tipo de clave inválido para mensajes")
+    return MensajeOut(
+        id=mensaje_id,
+        usuario_id=usuario_id,
+        sala_id=data.sala_id,
+        contenido=data.contenido,
+        fecha=fecha.isoformat(),
+        username=usuario["username"]
+    )
 
-    await r.lpush(clave, json.dumps(mensaje))
-    await r.ltrim(clave, 0, MAX_MENSAJES - 1)
-
-    return MensajeOut(**mensaje)
-
-# ✅ Obtener últimos mensajes de la sala (máx 50)
 async def obtener_mensajes(sala_id: str, limite: int = 50) -> list[MensajeOut]:
-    clave = f"sala:{sala_id}:mensajes"
-    tipo = await r.type(clave)
-    if tipo == b"none":
-        return []
+    cursor = mensajes_collection.find(
+        {"sala_id": sala_id}
+    ).sort("fecha", -1).limit(limite)
 
-    if tipo != b"list":
-        raise Exception("Tipo de clave inválido para mensajes")
-
-    mensajes_raw = await r.lrange(clave, 0, limite - 1)
     mensajes = []
-    for m in mensajes:
-        print(f'mesajes chat debug: {m}')
-    for raw in reversed(mensajes_raw):  # del más viejo al más nuevo
-        try:
-            data = json.loads(raw)
-            mensajes.append(MensajeOut(**data))
-        except (json.JSONDecodeError, TypeError, KeyError):
-            continue
+    async for doc in cursor:
+        usuario = await usuarios_collection.find_one({"_id": doc["usuario_id"]})
+        mensajes.append(MensajeOut(
+            id=doc["_id"],
+            usuario_id=doc["usuario_id"],
+            sala_id=doc["sala_id"],
+            contenido=doc["contenido"],
+            fecha=doc["fecha"].isoformat(),
+            username=usuario["username"] if usuario else "Desconocido"
+        ))
 
-    return mensajes
+    return list(reversed(mensajes))  # del más viejo al más nuevo
 
 
 ## ------------------- Funciones no adaptadas aun para list
