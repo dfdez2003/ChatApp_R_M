@@ -95,3 +95,10 @@ async def eliminar_sala(data: EliminarSalaData, user = Depends(get_current_user)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     
+
+
+@router.get("/salas/{sala_id}/ttl")
+async def obtener_ttl_sala(sala_id: str):
+    clave = f"sala:{sala_id}"
+    ttl = await r.ttl(clave)
+    return {"ttl": ttl}

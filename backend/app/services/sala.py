@@ -45,6 +45,9 @@ async def crear_sala(data, creador_id: str):
     fecha = datetime.utcnow().isoformat()
     password_hash = hash_password(data.password) if data.password else ""
     es_publica = "0" if password_hash else "1"
+    sala_key = f"sala:{sala_id}"
+    # Registrar sala en conjunto de activas
+    await r.sadd("salas:activas", sala_key)
 
     sala_hash_key = f"sala:{sala_id}"
     sala_usuarios_key = f"sala:{sala_id}:usuarios"
@@ -90,7 +93,7 @@ async def crear_sala(data, creador_id: str):
     await safe_add_usuario_sala(r, sala_id, usuario_key)
 
     try:
-        segundos = int(data.tiempo_vida or 2) * 3600
+        segundos = int(data.tiempo_vida or 2) * 60
         await r.expire(sala_hash_key, segundos)
         await r.expire(sala_usuarios_key, segundos)
         await r.expire(f"sala:{sala_id}:mensajes", segundos)
@@ -340,10 +343,12 @@ async def crear_sala_redis(
     fecha_creacion: datetime,
     usuarios: list
 ):
+    
     sala_key = f"sala:{sala_id}"
     sala_usuarios_key = f"sala:{sala_id}:usuarios"
+    
     creador_salas_key = f"usuario:{creador_id}:salas"
-
+    await r.sadd("salas:activas", sala_key) # limpieza
     # Hash principal
     await r.hset(sala_key, mapping={
         "nombre": nombre,

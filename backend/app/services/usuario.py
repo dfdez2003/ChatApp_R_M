@@ -8,7 +8,7 @@ import redis.asyncio as redis
 import logging
 from fastapi import HTTPException
 from db.mongodb import usuarios_collection
-from services.transaccion import crear_usuario_y_sala_mongo
+from services.transacciones import crear_usuario_y_sala_mongo
 from  services.sala import crear_sala_redis
 
 logger = logging.getLogger(__name__)

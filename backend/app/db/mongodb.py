@@ -12,5 +12,5 @@ db = mongo_client["ChatApp"]
 usuarios_collection = db["usuarios"]
 salas_collection = db["salas"]
 mensajes_collection = db["mensajes"]
-
+historial_collection = db["historial"]
 client = mongo_client  # Exporta el cliente por si necesitas start_session()
