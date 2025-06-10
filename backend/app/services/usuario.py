@@ -7,7 +7,8 @@ from schemas.usuario import UsuarioOut, UsuarioCreate, UsuarioLogin
 import redis.asyncio as redis
 import logging
 from fastapi import HTTPException
-from db.mongodb import usuarios_collection
+from db.mongodb import usuarios_collection_maestro
+from services.transacciones import crear_usuario_y_sala_mongo
 from services.transacciones import crear_usuario_y_sala_mongo
 from  services.sala import crear_sala_redis
 
@@ -23,7 +24,7 @@ async def crear_usuario(data):
     data_obj = UsuarioCreate(**data.dict()) if hasattr(data, "dict") else UsuarioCreate(**data)
 
     # Verificar correo duplicado
-    existing = await usuarios_collection.find_one({"email": data_obj.email})
+    existing = await usuarios_collection_maestro.find_one({"email": data_obj.email})
     if existing:
         raise Exception("Correo ya registrado")
 
@@ -75,7 +76,7 @@ async def crear_usuario(data):
     }
 
 async def logiar_usuario(data: UsuarioLogin):
-    usuario = await usuarios_collection.find_one({"username": data.username})
+    usuario = await usuarios_collection_maestro.find_one({"username": data.username})
     if not usuario:
         raise Exception("Usuario o contraseña incorrectos")
 
@@ -99,7 +100,7 @@ async def logiar_usuario(data: UsuarioLogin):
 
 async def obtener_usuario_por_id(usuario_id: str) -> UsuarioOut:
     try:
-        usuario = await usuarios_collection.find_one({"_id": usuario_id})
+        usuario = await usuarios_collection_maestro.find_one({"_id": usuario_id})
         if not usuario:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
