@@ -1,7 +1,9 @@
 # mongo_transacciones.py
 
-from db.mongodb import client_Maestro as mongo_client_maestro, usuarios_collection_maestro, salas_collection_maestro
+from db.mongodb import client_Maestro as mongo_client_maestro, usuarios_collection_maestro, salas_collection_maestro, mensajes_collection_maestro
 from datetime import datetime
+from services.historial import guardar_historial_sala
+
 from pymongo.errors import PyMongoError
 from passlib.context import CryptContext
 import uuid
@@ -32,7 +34,6 @@ async def crear_usuario_y_sala_mongo(data: UsuarioCreate):
         "es_publica": True,
         "password_hash": None,
         "fecha_creacion": fecha_actual,
-        "miembros": [usuario_id],
     }
 
     try:
@@ -51,3 +52,26 @@ async def crear_usuario_y_sala_mongo(data: UsuarioCreate):
 
     except PyMongoError as e:
         return {"ok": False, "error": str(e)}
+
+
+
+async def migrar_sala_a_historial(sala_id: str):
+    try:
+        async with await mongo_client_maestro.start_session() as session:
+            async with session.start_transaction():
+                sala = await salas_collection_maestro.find_one({"_id": sala_id}, session=session)
+                if not sala:
+                    raise Exception(f"Sala {sala_id} no encontrada")
+
+                mensajes_cursor = mensajes_collection_maestro.find({"sala_id": sala_id}, session=session)
+                mensajes = await mensajes_cursor.to_list(length=None)
+
+                # Guardar en historial (fuera del bloque atomic si no queremos rollback)
+                await guardar_historial_sala(sala, mensajes)
+
+                # Eliminar sala y mensajes originales
+                await salas_collection_maestro.delete_one({"_id": sala_id}, session=session)
+                await mensajes_collection_maestro.delete_many({"sala_id": sala_id}, session=session)
+
+    except PyMongoError as e:
+        raise Exception(f"Error en transacción MongoDB: {str(e)}")

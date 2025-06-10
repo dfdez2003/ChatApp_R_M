@@ -8,6 +8,7 @@ if (!token || !usuario) {
 }
 
 
+
 document.addEventListener("DOMContentLoaded", () => {
   console.log("✅ Usuario desde sessionStorage:", usuario);
   mostrarDatosUsuario(usuario);
@@ -140,6 +141,15 @@ function mostrarMisSalas(salas) {
     // Iniciar cuenta regresiva
     const tiempoEl = document.getElementById(tiempoId);
     iniciarCuentaRegresivaElemento(sala.tiempo_restante, tiempoEl);
+    if (sala.tiempo_restante < 60 && sala.tiempo_restante > 0) {
+      const alerta = document.createElement("div");
+      alerta.textContent = "⚠️ Sala expirando pronto";
+      alerta.style.color = "orange";
+      alerta.style.fontWeight = "bold";
+      alerta.style.marginTop = "4px";
+      div.appendChild(alerta);
+    }
+    
   });
 }
 

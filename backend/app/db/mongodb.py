@@ -34,3 +34,6 @@ colecciones = {
 
 client_Maestro = mongo_client_maestro  # Exporta el cliente por si necesitas start_session()
 client_Esclavo = mongo_client_esclavo
+
+
+historial_collection = db_Maestro["historial"]

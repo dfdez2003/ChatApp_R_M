@@ -1,42 +1,62 @@
 import redis.asyncio as redis
 import asyncio
-import json
-
+from services.transacciones import migrar_sala_a_historial
 r = redis.Redis()
+
+async def limpiar_sala_completa(sala_id: str):
+    print(f"🧹 Limpiando datos de sala {sala_id}...")
+
+    sala_key = f"sala:{sala_id}"
+    mensajes_key = f"sala:{sala_id}:mensajes"
+    usuarios_key = f"sala:{sala_id}:usuarios"
+
+    # Eliminar claves principales
+    await r.delete(sala_key)
+    await r.delete(mensajes_key)
+    await r.delete(usuarios_key)
+
+    # Eliminar referencia en cada usuario
+    async for usuario_salas_key in r.scan_iter("usuario:*:salas"):
+        await r.srem(usuario_salas_key, sala_key)
+
+    # Eliminar de salas:activas
+    await r.srem("salas:activas", sala_key)
+
+    print(f"✅ Sala {sala_id} completamente eliminada.")
+
 
 async def tarea_limpieza_salas():
     while True:
         print("🔄 Ejecutando limpieza de salas expiradas...")
+
         try:
-            async for key in r.scan_iter("sala:*"):
+            ids_activas = await r.smembers("salas:activas")
+            for key in ids_activas:
                 key_str = key.decode()
+                sala_id = key_str.split(":")[1]
 
-                # Saltar si no es la clave principal (ej: sala:{id}, no sala:{id}:mensajes)
-                if ":" in key_str and not key_str.count(":") == 1:
-                    continue
+                existe = await r.exists(f"sala:{sala_id}")
+                if existe == 0:  # ya expiró
 
-                tipo = await r.type(key)
-                if tipo != b"hash":
-                    continue
+                    print(f"⚠️ Sala {sala_id} ya no existe en Redis. Procediendo con limpieza...")
 
-                ttl = await r.ttl(key)
-                if ttl == -2:  # -2 significa que ya expiró
-                    sala_id = key_str.split(":")[1]
-                    print(f"🗑️ Sala expirada encontrada: {sala_id}")
-
-                    # Eliminar la sala
-                    await r.delete(key)
+                    # Limpiar claves relacionadas en Redis
                     await r.delete(f"sala:{sala_id}:mensajes")
+                    await r.srem("salas:activas", f"sala:{sala_id}")
 
-                    # Buscar usuarios que tengan esa sala
+                    # Limpiar de usuarios
                     async for usuario_key in r.scan_iter("usuario:*:salas"):
-                        tipo_salas = await r.type(usuario_key)
-                        if tipo_salas != b"set":
-                            continue
                         await r.srem(usuario_key, f"sala:{sala_id}")
 
-                    print(f"✅ Sala {sala_id} eliminada correctamente.")
-        except Exception as e:
-            print(f"❌ Error en limpieza de salas: {e}")
+                    # Ejecutar transacción MongoDB
+                    try:
+                        await migrar_sala_a_historial(sala_id)
+                        print(f"✅ Sala {sala_id} migrada a historial y eliminada de MongoDB.")
+                    except Exception as e:
+                        print(f"❌ Error al migrar a historial MongoDB: {e}")
 
-        await asyncio.sleep(60)  # Espera 60 segundos antes de repetir
+        except Exception as e:
+            print(f"❌ Error en limpieza periódica: {e}")
+
+        await asyncio.sleep(60)
+
